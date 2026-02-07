@@ -37,12 +37,29 @@ div.stButton > button:focus {
 }
 </style>
 """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+/* Import Aleo font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Aleo&display=swap');
+
+/* Apply Alteo font to all titles (st.title) */
+h1 {
+    font-family: 'Aleo', sans-serif !important;
+    font-weight: normal !important; /* Aleo is naturally bold, adjust if needed */
+}
+
+/* Optional: make all headers (h2, h3) use Aleo too */
+h2, h3 {
+    font-family: 'Aleo', sans-serif !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # SESSION STATE INIT
 # -----------------------------
 if "step" not in st.session_state:
-    st.session_state.step = 0
+    st.session_state.step = -1
 
 if "stores_selected" not in st.session_state:
     st.session_state.stores_selected = set()
@@ -77,6 +94,24 @@ PANTRY_CATEGORIES = {
 }
 CATEGORY_ORDER = list(PANTRY_CATEGORIES.keys())
 TOTAL_CATEGORIES = len(CATEGORY_ORDER)
+# -----------------------------
+# WELCOME PAGE
+# -----------------------------
+if "step" not in st.session_state:
+    st.session_state.step = -1  # start with welcome page
+
+if st.session_state.step == -1:
+    st.title("🧺 PantryFull")
+    st.markdown("""
+    **Welcome to PantryFull!**  
+    You'll never have to say "oh no, we're out" again
+    PantryFull helps you keep your pantry organized, track what you usually buy,  
+    and get AI-powered insights to make shopping easier.  
+    Never run out of your essentials again!
+    """)
+    if st.button("Get Started →"):
+        st.session_state.step = 0
+        st.rerun()
 
 # -----------------------------
 # STEP 0 — LAST GROCERY TRIP

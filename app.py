@@ -131,7 +131,7 @@ TOTAL_CATEGORIES = len(CATEGORY_ORDER)
 # -----------------------------
 if st.session_state.step == -1:
     st.title("🧺 PantryFull")
-<<<<<<< HEAD
+
     st.markdown("""
     **Welcome to PantryFull!** You'll never have to say "oh no, we're out" again
     PantryFull helps you keep your pantry organized, track what you usually buy,  
@@ -141,7 +141,7 @@ if st.session_state.step == -1:
     if st.button("Get Started →"):
         st.session_state.step = 0
         st.rerun()
-=======
+
 
     col_img, col_text = st.columns([1, 2])
 
@@ -160,8 +160,6 @@ if st.session_state.step == -1:
         """)
 
         st.button("Get Started →", on_click=lambda: st.session_state.update({"step": 0}))
-
->>>>>>> d444d8a3f0fa1b08d01510c15d54fcdee9359ae6
 
 # -----------------------------
 # STEP 0 — LAST GROCERY TRIP

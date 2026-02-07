@@ -6,6 +6,7 @@ import ai_logic
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
+
 st.set_page_config(page_title="PantryFull", page_icon="🧺", layout="centered")
 
 # -----------------------------
@@ -43,6 +44,25 @@ st.markdown(
 # -----------------------------
 # GLOBAL CSS (ENHANCED PILL BUTTONS)
 # -----------------------------
+st.markdown("""
+<style>
+/* Global text color */
+html, body, [class*="css"] {
+    color: #1E3A8A !important;  /* dark blue */
+}
+
+/* Titles & headers */
+h1, h2, h3, h4, h5, h6 {
+    color: #1E3A8A !important;
+}
+
+/* Captions, labels, markdown, metrics */
+p, span, label, div {
+    color: #1E3A8A !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 div.stButton > button {

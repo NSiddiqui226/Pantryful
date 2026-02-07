@@ -267,99 +267,107 @@ elif st.session_state.step == 4:
         st.session_state.step = 5
         st.rerun()
 
-# -----------------------------
-# STEP 5 — DASHBOARD / AI-ON-DEMAND
-# -----------------------------
 elif st.session_state.step == 5:
-    st.title("⚡ Smart Dashboard")
-    last_trip = st.session_state.last_trip_date
-    days_since = (datetime.date.today() - last_trip).days if last_trip else None
+    st.title("⚡ Smart Pantry Dashboard")
+    
+    # --- 1. THE DATA SYNC ---
+    # Force the AI to analyze the data if it hasn't yet
+    if not st.session_state.ai_triggered:
+        with st.spinner("🧠 AI is analyzing your pantry & store prices..."):
+            # This calls your predict_low_stock which handles the Scarcity vs Surplus logic
+            st.session_state.ai_results = ai_logic.predict_low_stock(
+                usual_items=st.session_state.usuals,
+                household_size=st.session_state.h_size,
+                grocery_freq=st.session_state.grocery_freq,
+                last_trip=st.session_state.last_trip_date
+            )
+            st.session_state.ai_triggered = True
 
-    col1, col2 = st.columns(2)
-    col1.metric("Household Size", st.session_state.h_size)
-    col2.metric("Stores", ", ".join(st.session_state.stores))
+    results = st.session_state.ai_results
+    shopping_list = results.get("shopping_list", [])
+    recipes = results.get("recipes", [])
+    low_items = results.get("low_items", [])
+
+    # --- 2. TOP KPI BAR ---
+    from data_engine import MOCK_PURCHASE_HISTORY
+    # Calculate how many items are over 10 days old
+    aging_items = [k for k, v in MOCK_PURCHASE_HISTORY.items() if (datetime.date.today() - v).days > 10]
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Household", f"{st.session_state.h_size} Ppl")
+    m2.metric("Waste Risk", f"{len(aging_items)} Items", delta="Action Required", delta_color="inverse")
+    m3.metric("Stock Alerts", f"{len(low_items)} Low", delta="-5% vs Last Week")
 
     st.markdown("---")
-    tabs = st.tabs(["📦 Your Pantry AI Insights", "🛒 Shopping List", "💡 Upsells", "🍳 Recipes"])
 
-    # AI Insights Tab
-    with tabs[0]:
-        st.subheader("Your Pantry AI Insights")
-        if last_trip:
-            st.write(f"📅 Your last grocery trip: {last_trip.strftime('%m/%d/%Y')} ({days_since} day(s) ago)")
-            low_items = []
-            for cat, items in st.session_state.usuals.items():
-                for item in items:
-                    threshold_days = max(1, int(7 / st.session_state.grocery_freq))
-                    if days_since >= threshold_days:
-                        low_items.append(item)
-            if low_items:
-                st.markdown("⚠️ You are likely running low on:")
-                for item in low_items:
-                    st.write(f"• {item}")
+    # --- 3. THE INTERACTIVE GRID ---
+    col_left, col_right = st.columns(2)
+
+    # CARD 1: SMART SHOPPING (Scarcity Logic)
+    with col_left:
+        with st.container(border=True):
+            st.markdown("### 🛒 Smart Cart")
+            st.caption("Cheapest matches for items you're running out of")
+            
+            if shopping_list:
+                for item in shopping_list:
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        # Displaying the item and the reason it was added
+                        st.checkbox(f"**{item['item']}**", key=f"list_{item['item']}", value=True)
+                        st.caption(f"📍 {item.get('store', 'Walmart')} • {item.get('reason', 'Refill')}")
+                    with c2:
+                        # Pulling real mock price from data_engine
+                        price = item.get('price', 0.00)
+                        st.markdown(f"**${price:.2f}**")
             else:
-                st.write("✅ Your pantry is likely stocked for now.")
-            suggested_next = last_trip + datetime.timedelta(days=int(7 / st.session_state.grocery_freq))
-            st.write(f"🛒 Suggested next grocery trip: **{suggested_next.strftime('%A, %b %d')}**")
-        else:
-            st.info("Please select your last grocery trip date in the first step.")
+                st.success("✅ Shopping list is clear!")
 
-        st.markdown("💰 Deals of the day (mocked):")
-        MOCK_DEALS = [
-            {"store": "Walmart", "item": "Whole Milk", "price": 2.99},
-            {"store": "Costco", "item": "Chicken Breast", "price": 3.79},
-            {"store": "Target", "item": "Apples", "price": 0.99},
-        ]
-        for deal in MOCK_DEALS:
-            st.write(f"{deal['item']} at {deal['store']}: ${deal['price']:.2f}")
+    # CARD 2: FRESHNESS TRACKER (Historical Logic)
+    with col_right:
+        with st.container(border=True):
+            st.markdown("### 📦 Freshness Tracker")
+            st.caption("Based on last bought dates in Data Engine")
+            
+            for item, buy_date in MOCK_PURCHASE_HISTORY.items():
+                days_old = (datetime.date.today() - buy_date).days
+                # Visual bar: Red for old, Green for fresh
+                progress = min(days_old / 21, 1.0)
+                bar_color = "red" if days_old > 14 else "orange" if days_old > 7 else "green"
+                
+                st.markdown(f"**{item}** — {days_old} days old")
+                st.markdown(f"""
+                    <div style="width:100%; background:#f0f2f6; border-radius:10px; height:8px;">
+                        <div style="width:{progress*100}%; background:{bar_color}; height:8px; border-radius:10px;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
+                st.write("") # Spacer
 
-    # AI-Curated Shopping List
-    with tabs[1]:
-        st.subheader("Your AI-Curated Shopping List")
-        shopping_list = st.session_state.ai_results.get("shopping_list", [])
-        if shopping_list:
-            st.markdown("**Based on your usual pantry items:**")
-            for item in shopping_list:
-                selected = st.checkbox(f"{item['item']} — Qty: {item['recommended_quantity']}", value=True,
-                                       key=item['item'])
-                if selected and item['item'] not in st.session_state.shopping_selection:
-                    st.session_state.shopping_selection.append(item['item'])
-            if st.button("✅ Add All to List"):
-                st.session_state.shopping_selection = [item['item'] for item in shopping_list]
-                st.success("All items added to your selection!")
-            st.markdown("---")
-            st.markdown("**Based on your preferences you might like to add:**")
-            upsells = st.session_state.ai_results.get("upsell_suggestions", [])
-            for u in upsells:
-                selected = st.checkbox(f"{u['item']} — {u.get('why', '')}", value=False, key=f"upsell_{u['item']}")
-                if selected and u['item'] not in st.session_state.shopping_selection:
-                    st.session_state.shopping_selection.append(u['item'])
-        else:
-            st.info("No AI-generated shopping list yet.")
+    # CARD 3: ZERO-WASTE CHEF (Surplus Logic)
+    st.markdown("### 🍳 Zero-Waste Recipes")
+    st.caption("Using aging items while protecting your low-stock staples")
+    
+    if recipes:
+        # Display recipes in a horizontal scrolling-style grid
+        recipe_cols = st.columns(len(recipes))
+        for i, r in enumerate(recipes):
+            with recipe_cols[i]:
+                with st.container(border=True):
+                    st.markdown(f"##### {r['name']}")
+                    # Extract the "clears out" info if available
+                    if "clears out" in r['name'].lower():
+                        st.toast(f"Found recipe for {r['name']}")
+                    
+                    with st.expander("View Preparation"):
+                        st.write(r['instructions'])
+                    
+                    if st.button("Cook This", key=f"cook_{i}", use_container_width=True):
+                        st.balloons()
+    else:
+        st.info("AI is looking for recipes that won't use up the last of your stock...")
 
-    # Upsells Tab
-    with tabs[2]:
-        st.subheader("All AI Upsells")
-        upsells = st.session_state.ai_results.get("upsell_suggestions", [])
-        if upsells:
-            for u in upsells:
-                st.write(f"• {u['item']} — {u.get('why', '')}")
-        else:
-            st.info("No upsell suggestions at this time.")
-
-    # Recipes Tab
-    with tabs[3]:
-        st.subheader("Recipes You Can Make")
-        recipes = st.session_state.ai_results.get("recipes", [])
-        if recipes:
-            for r in recipes:
-                st.markdown(f"**{r['name']}**")
-                st.write(r["instructions"])
-                st.markdown("---")
-        else:
-            st.info("No recipes generated yet.")
-
-    # Reset button
-    if st.button("🔄 Start Over"):
-        st.session_state.clear()
+    # --- 4. ACTION FOOTER ---
+    st.markdown("---")
+    if st.button("🔄 Force Refresh AI Insights"):
+        st.session_state.ai_triggered = False
         st.rerun()

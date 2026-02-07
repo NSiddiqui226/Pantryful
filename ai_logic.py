@@ -1,7 +1,15 @@
+# ai_logic.py
 import google.generativeai as genai
 import os
+import json
+import random
 from dotenv import load_dotenv
-from data_engine import get_live_details, find_best_alternative
+from data_engine import (
+    get_live_details,
+    find_cheapest_store,
+    find_best_alternative,
+    find_category_substitute
+)
 
 # -----------------------------
 # AI SETUP (SAFE ON IMPORT)
@@ -13,70 +21,131 @@ genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # -----------------------------
-# CORE LOGIC FUNCTION (USED BY STREAMLIT)
+# CORE AI CURATION ENGINE
 # -----------------------------
-def analyze_pantry(household_size, stores):
-    daily_usage = household_size * 0.5
-    days_left = max(1, int(10 / daily_usage))
-
-    live_data = get_live_details("Oat Milk", stores)
-    in_stock = any(v["stock"] > 0 for v in live_data.values())
-
-    if not in_stock:
-        alt = find_best_alternative("Oat Milk", stores)
-        recommendation = (
-            f"🚨 ALERT: Oat Milk is unavailable at your stores. "
-            f"Available at {alt['store']} for ${alt['price']}."
-            if alt else
-            "🚨 ALERT: Oat Milk is unavailable nearby."
-        )
-        status = "Out of Stock"
-    else:
-        recommendation = "✅ You have enough oat milk for now."
-        status = "In Stock"
-
-    return {
-        "days_left": days_left,
-        "status": status,
-        "recommendation": recommendation,
-        "ai_tip": "Use smoothies or overnight oats to stretch your supply."
-    }
-
-# -----------------------------
-# CLI MODE (ONLY RUNS IF DIRECTLY EXECUTED)
-# -----------------------------
-if __name__ == "__main__":
-    print("\n--- 🤖 AUTO-PILOT PANTRY AI IS LIVE ---")
-    print("Type 'quit' to exit.\n")
-
-    while True:
-        user_input = input("You: ")
-        if user_input.lower() in ["quit", "exit", "bye"]:
-            break
-
-        try:
-            response = model.generate_content(user_input)
-            print(f"\nAI: {response.text}\n")
-        except Exception as e:
-            print(f"\n❌ Error: {e}")
-
-def generate_shopping_list(household_size, stores):
+def generate_shopping_list(
+    household_size,
+    grocery_freq,
+    stores,
+    pantry_usuals
+):
     """
-    Returns a simulated shopping list and recipe suggestions
+    Uses AI to curate a shopping list, recipes, and upsells
+    based on user behavior and pantry data.
     """
-    # Simulate items running low based on household size
-    shopping_list = [
-        {"name": "Oat Milk", "quantity": max(1, household_size)},
-        {"name": "Eggs", "quantity": max(6, household_size * 2)},
-        {"name": "Apples", "quantity": max(4, household_size * 2)},
-        {"name": "Bread", "quantity": 2}
-    ]
 
-    # Simulated recipes based on pantry
-    recipes = [
-        {"name": "Pancakes", "instructions": "Use eggs, milk, flour. Fry on skillet."},
-        {"name": "Fruit Salad", "instructions": "Chop apples, mix with other fruits."},
-        {"name": "Omelette", "instructions": "Use eggs and vegetables in fridge."}
-    ]
+    # Flatten pantry items
+    flat_items = []
+    for category, items in pantry_usuals.items():
+        for item in items:
+            flat_items.append(f"{item} ({category})")
 
-    return {"shopping_list": shopping_list, "recipes": recipes}
+    # Mock store availability context
+    store_context = {}
+    for item in flat_items:
+        store_context[item] = get_live_details(item.split(" (")[0], stores)
+
+    # -----------------------------
+    # MAXIMALLY CONTEXTUAL PROMPT
+    # -----------------------------
+    prompt = f"""
+You are an expert culinary AI and grocery recommendation engine.
+
+User profile:
+- Household size: {household_size}
+- Grocery shopping frequency: {grocery_freq} times per week
+- Preferred stores: {", ".join(stores)}
+
+User's usual pantry items (categorized):
+{json.dumps(pantry_usuals, indent=2)}
+
+Store availability data (mock, may be incomplete):
+{json.dumps(store_context, indent=2)}
+
+Your tasks:
+1. Generate a **personalized shopping list** based on the user's pantry, household size, and shopping habits.
+   - Include realistic quantities (units, weights, or volumes).
+   - Include a short reason for each item.
+2. Recommend 1–2 **upsell or complementary items**.
+3. Generate **3 real, authentic recipes** that:
+   - Use as many items as possible from the user's pantry and shopping list.
+   - Have **real-world recipe names** (e.g., "Butter Chicken," "Spaghetti Aglio e Olio," "Fettuccine Alfredo").
+   - Include **step-by-step cooking instructions** suitable for a home cook.
+   - Only include recipes that are feasible given the user's pantry/shopping list.
+   - Be diverse in cuisine/style if possible.
+
+**Important instructions for output:**
+- Output MUST be valid JSON with these keys: "shopping_list", "recipes", "upsell_suggestions".
+- Each shopping list item: item, recommended_quantity, reason.
+- Each recipe: name, instructions.
+- Each upsell: item, why.
+- DO NOT include explanations or markdown outside of JSON.
+- DO NOT hardcode quantities—estimate based on household size and shopping frequency.
+
+Example JSON format:
+{{
+  "shopping_list": [
+    {{
+      "item": "string",
+      "recommended_quantity": "string",
+      "reason": "string"
+    }}
+  ],
+  "recipes": [
+    {{
+      "name": "string",
+      "instructions": "string"
+    }}
+  ],
+  "upsell_suggestions": [
+    {{
+      "item": "string",
+      "why": "string"
+    }}
+  ]
+}}
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+
+        # Safety: extract JSON even if model adds noise
+        json_start = text.find("{")
+        json_end = text.rfind("}") + 1
+        parsed = json.loads(text[json_start:json_end])
+
+        # Ensure all keys exist
+        parsed.setdefault("shopping_list", [])
+        parsed.setdefault("recipes", [])
+        parsed.setdefault("upsell_suggestions", [])
+
+        return parsed
+
+    except Exception as e:
+        # Fallback: generate minimal list based on actual pantry items
+        fallback_list = []
+        for category, items in pantry_usuals.items():
+            for item in items:
+                fallback_list.append({
+                    "item": item,
+                    "recommended_quantity": f"{max(1, household_size)} unit(s)",
+                    "reason": f"Based on your usual {category.lower()} items"
+                })
+
+        # Fallback recipes: random selection
+        pantry_items_flat = [item for items in pantry_usuals.values() for item in items]
+        fallback_recipes = []
+        for i in range(3):
+            selected_items = random.sample(pantry_items_flat, min(2, len(pantry_items_flat)))
+            fallback_recipes.append({
+                "name": f"Quick Recipe {i+1}",
+                "instructions": f"Use {', '.join(selected_items)} together to make a simple meal."
+            })
+
+        return {
+            "shopping_list": fallback_list,
+            "recipes": fallback_recipes,
+            "upsell_suggestions": [],
+            "error": str(e)
+        }

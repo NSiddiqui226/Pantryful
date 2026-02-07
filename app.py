@@ -3,6 +3,7 @@ import pandas as pd
 import ai_logic
 import time
 import random
+from data_engine import find_cheapest_store, find_best_alternative
 
 st.set_page_config(page_title="PantryFull", page_icon="🧺", layout="centered")
 
@@ -12,11 +13,12 @@ st.set_page_config(page_title="PantryFull", page_icon="🧺", layout="centered")
 if "step" not in st.session_state:
     st.session_state.step = 0
 
-if "ai_results" not in st.session_state:
-    st.session_state.ai_results = None
-
-if "ai_triggered" not in st.session_state:
-    st.session_state.ai_triggered = False
+if "ai_results" not in st.session_state or st.session_state.ai_results is None:
+    st.session_state.ai_results = {
+        "shopping_list": [],
+        "upsell_suggestions": [],
+        "recipes": []
+    }
 
 if "usuals" not in st.session_state:
     st.session_state.usuals = {}
@@ -31,40 +33,11 @@ if "loading_step" not in st.session_state:
 # CATEGORY DATA (MOCK, EXPANDABLE)
 # -----------------------------
 PANTRY_CATEGORIES = {
-    "Dairy": [
-        "Whole Milk",
-        "Oat Milk",
-        "Almond Milk",
-        "Greek Yogurt",
-        "Butter",
-        "Cheddar Cheese"
-    ],
-    "Protein": [
-        "Eggs",
-        "Chicken Breast",
-        "Ground Beef",
-        "Salmon",
-        "Tofu"
-    ],
-    "Produce": [
-        "Apples",
-        "Bananas",
-        "Spinach",
-        "Tomatoes",
-        "Onions"
-    ],
-    "Pantry": [
-        "Rice",
-        "Pasta",
-        "Olive Oil",
-        "Cereal",
-        "Peanut Butter"
-    ],
-    "Frozen": [
-        "Frozen Vegetables",
-        "Frozen Pizza",
-        "Ice Cream"
-    ]
+    "Dairy": ["Whole Milk", "Oat Milk", "Almond Milk", "Greek Yogurt", "Butter", "Cheddar Cheese"],
+    "Protein": ["Eggs", "Chicken Breast", "Ground Beef", "Salmon", "Tofu"],
+    "Produce": ["Apples", "Bananas", "Spinach", "Tomatoes", "Onions"],
+    "Pantry": ["Rice", "Pasta", "Olive Oil", "Cereal", "Peanut Butter"],
+    "Frozen": ["Frozen Vegetables", "Frozen Pizza", "Ice Cream"]
 }
 
 CATEGORY_ORDER = list(PANTRY_CATEGORIES.keys())
@@ -78,10 +51,7 @@ if st.session_state.step == 0:
     st.caption("Your pantry, but proactive.")
 
     st.markdown("### Where do you usually shop?")
-    stores = st.multiselect(
-        "Select all that apply",
-        ["Walmart", "Costco", "Target"]
-    )
+    stores = st.multiselect("Select all that apply", ["Walmart", "Costco", "Target"])
 
     if st.button("Continue →"):
         if stores:
@@ -108,7 +78,6 @@ elif st.session_state.step == 1:
     if col1.button("← Back"):
         st.session_state.step = 0
         st.rerun()
-
     if col2.button("Next →"):
         st.session_state.h_size = h_size
         st.session_state.grocery_freq = grocery_freq
@@ -116,15 +85,13 @@ elif st.session_state.step == 1:
         st.rerun()
 
 # -----------------------------
-# STEP 2 — USUALS (CATEGORY BY CATEGORY)
+# STEP 2 — USUALS
 # -----------------------------
 elif st.session_state.step == 2:
     category = CATEGORY_ORDER[st.session_state.category_index]
     items = PANTRY_CATEGORIES[category]
 
     st.title("🧺 PantryFull")
-
-    # Progress bar
     progress = (st.session_state.category_index + 1) / TOTAL_CATEGORIES
     st.progress(progress)
     st.caption(f"Category {st.session_state.category_index + 1} of {TOTAL_CATEGORIES}")
@@ -132,16 +99,9 @@ elif st.session_state.step == 2:
     st.markdown(f"### {category}")
     st.caption("Select what you usually keep at home — or skip if it doesn’t apply.")
 
-    # Load previous selections if any
     default_selection = st.session_state.usuals.get(category, [])
+    selections = st.multiselect(f"Your usual {category.lower()} items", items, default=default_selection)
 
-    selections = st.multiselect(
-        f"Your usual {category.lower()} items",
-        items,
-        default=default_selection
-    )
-
-    # Update session state only if the user selected something
     if selections:
         st.session_state.usuals[category] = selections
 
@@ -155,7 +115,6 @@ elif st.session_state.step == 2:
 
     # SKIP
     if col2.button("Skip →"):
-        # Do NOT overwrite previous selection — just move to next
         if st.session_state.category_index < TOTAL_CATEGORIES - 1:
             st.session_state.category_index += 1
         else:
@@ -164,7 +123,6 @@ elif st.session_state.step == 2:
 
     # NEXT
     if col3.button("Next →"):
-        # Save selection even if empty
         st.session_state.usuals[category] = selections
         if st.session_state.category_index < TOTAL_CATEGORIES - 1:
             st.session_state.category_index += 1
@@ -173,7 +131,7 @@ elif st.session_state.step == 2:
         st.rerun()
 
 # -----------------------------
-# STEP 3 — REVIEW YOUR CHOICES
+# STEP 3 — REVIEW CHOICES
 # -----------------------------
 elif st.session_state.step == 3:
     st.title("🧺 Review Your Pantry Setup")
@@ -189,7 +147,6 @@ elif st.session_state.step == 3:
     st.write(f"{st.session_state.grocery_freq} times per week")
 
     st.markdown("### 📦 Your Usual Items")
-
     has_items = False
     for category, items in st.session_state.usuals.items():
         if items:
@@ -202,71 +159,16 @@ elif st.session_state.step == 3:
         st.caption("No usual items selected — we’ll still make smart predictions.")
 
     st.markdown("---")
-
     col1, col2 = st.columns(2)
-
     if col1.button("← Edit Choices"):
         st.session_state.step = 2
         st.rerun()
-
     if col2.button("Looks Good →"):
-        st.session_state.step = 99
+        st.session_state.step = 4
         st.rerun()
 
 # -----------------------------
-# STEP 99 — LOADING SCREEN / AI CURATION
-# -----------------------------
-elif st.session_state.step == 99:
-    st.markdown(
-        """
-        <style>
-        .centered {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 90vh;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown('<div class="centered">', unsafe_allow_html=True)
-
-    # FULL SCREEN GIF
-    st.image(
-        "https://media.giphy.com/media/3oEjHEbAfMn6PVEqDS/giphy.gif",
-        use_column_width=True
-    )
-
-    st.markdown("### 🧠 PantryFull is curating your personalized recommendations…")
-    st.caption("Analyzing your pantry, habits, and shopping patterns")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Simulate AI processing time
-    import time
-    time.sleep(3.5)  # make it slightly longer for effect
-
-    # -----------------------------
-    # TRIGGER AI LOGIC (shopping list & recipes)
-    # -----------------------------
-    import ai_logic
-
-    st.session_state.ai_results = ai_logic.generate_shopping_list(
-        household_size=st.session_state.h_size,
-        grocery_freq=st.session_state.grocery_freq,
-        stores=st.session_state.stores,
-        pantry_usuals=st.session_state.usuals
-    )
-    # Move to dashboard/chat
-    st.session_state.step = 4
-    st.rerun()
-
-
-# -----------------------------
-# STEP 4 — DASHBOARD / AI-ON-DEMAND
+# STEP 4 — DASHBOARD / AI
 # -----------------------------
 elif st.session_state.step == 4:
     st.title("⚡ Smart Dashboard")
@@ -278,56 +180,97 @@ elif st.session_state.step == 4:
 
     st.markdown("---")
 
-    # -----------------------------
-# AI-ON-DEMAND: Shopping List + Recipes
-# -----------------------------
-st.subheader("🛒 Your Next Shopping List")
-st.caption("Based on your pantry and consumption, here’s what we recommend:")
+    # Safe AI results access
+    ai_results = st.session_state.ai_results or {}
+    shopping_list = ai_results.get("shopping_list", [])
+    upsells = ai_results.get("upsell_suggestions", [])
+    recipes = ai_results.get("recipes", [])
 
-if st.session_state.ai_results is not None:
-    shopping_list = st.session_state.ai_results.get('shopping_list', [])
+    # Enrich shopping list with live pricing info
     for item in shopping_list:
-        st.write(f"• {item['item']} — Qty: {item['recommended_quantity']}")
-        st.caption(f"Reason: {item.get('reason', 'No reason provided')}")
+        item_name = item.get("item")
+        cheapest = find_cheapest_store(item_name, st.session_state.stores)
+        if cheapest:
+            item["cheapest_store"] = cheapest["store"]
+            item["price"] = cheapest["price"]
+            item["brand"] = cheapest["brand"]
+            item["discount_note"] = f"Available at {cheapest['store']} for ${cheapest['price']:.2f}"
+        else:
+            item["cheapest_store"] = None
+            item["price"] = None
+            item["brand"] = None
+            item["discount_note"] = "Out of stock at your preferred stores"
+            alternative = find_best_alternative(item_name, st.session_state.stores)
+            if alternative:
+                item["alternative_store"] = alternative["store"]
+                item["alternative_price"] = alternative["price"]
+                item["alternative_brand"] = alternative["brand"]
+                item["discount_note"] += f"; Available at {alternative['store']} for ${alternative['price']:.2f}"
 
-    st.markdown("---")
+    # Tabs
+    tabs = st.tabs(["📦 Your Pantry", "🛒 Shopping List", "💡 Upsells", "🍳 Recipes"])
 
-    # Upsell suggestions
-    upsells = st.session_state.ai_results.get('upsell_suggestions', [])
-    if upsells:
-        st.subheader("💡 Complementary Suggestions")
+    # Pantry Tab
+    with tabs[0]:
+        st.subheader("Your Pantry")
+        st.caption("Update items you ran out of; they'll automatically be added to your shopping list.")
+        for category, items in st.session_state.usuals.items():
+            st.markdown(f"**{category}**")
+            for i, item in enumerate(items):
+                out_key = f"out_{category}_{i}"
+                if st.checkbox(f"Ran out of {item}?", key=out_key):
+                    if not any(x["item"] == item for x in shopping_list):
+                        shopping_list.append({
+                            "item": item,
+                            "recommended_quantity": "1 unit",
+                            "reason": "You marked this as out of stock",
+                            "price": None,
+                            "cheapest_store": None,
+                            "discount_note": "You marked this as out of stock"
+                        })
+
+    # Shopping List Tab
+    with tabs[1]:
+        st.subheader("Your Shopping List")
+        if not shopping_list:
+            st.info("No items in your shopping list yet.")
+        for item in shopping_list:
+            st.markdown(f"**{item['item']}** — Qty: {item['recommended_quantity']}")
+            st.caption(f"Reason: {item.get('reason', 'No reason provided')}")
+            if item.get("price"):
+                st.write(f"💰 {item['brand']} at {item['cheapest_store']}: ${item['price']:.2f}")
+            if item.get("alternative_store"):
+                st.write(f"🔄 Alternative: {item['alternative_brand']} at {item['alternative_store']} for ${item['alternative_price']:.2f}")
+            if item.get("discount_note"):
+                st.info(item["discount_note"])
+            st.markdown("---")
+
+    # Upsells Tab
+    with tabs[2]:
+        st.subheader("Smart Suggestions / Upsells")
+        if not upsells:
+            st.info("No upsell suggestions at this time.")
         for u in upsells:
-            st.write(f"• {u['item']}")
-            st.caption(f"Why: {u.get('why', 'No reason provided')}")
+            st.write(f"• {u['item']} — {u.get('why', '')}")
 
-    st.markdown("---")
-
-    # AI-generated recipes
-    recipes = st.session_state.ai_results.get('recipes', [])
-    if recipes:
-        st.subheader("🍳 New Recipes to Try")
+    # Recipes Tab
+    with tabs[3]:
+        st.subheader("Recipes You Can Make")
+        if not recipes:
+            st.info("No recipes generated yet.")
         for r in recipes:
             st.markdown(f"**{r['name']}**")
-            st.write(r['instructions'])
+            st.write(r["instructions"])
             st.markdown("---")
 
-        # -----------------------------
-        # AI-ON-DEMAND: Recipe Suggestions
-        # -----------------------------
-        st.subheader("🍳 Recipe Suggestions")
-        st.caption("You can make these with your current pantry:")
-
-        recipes = st.session_state.ai_results['recipes']
-        for r in recipes:
-            st.markdown(f"**{r['name']}**")
-            st.write(r['instructions'])
-            st.markdown("---")
-
-    # RESET BUTTON
+    # Reset button
     if st.button("🔄 Start Over"):
         st.session_state.step = 0
-        st.session_state.ai_triggered = False
-        st.session_state.ai_results = None
+        st.session_state.ai_results = {
+            "shopping_list": [],
+            "upsell_suggestions": [],
+            "recipes": []
+        }
         st.session_state.usuals = {}
         st.session_state.category_index = 0
         st.rerun()

@@ -43,8 +43,8 @@ st.markdown("""
         overflow: hidden !important;
     }
 
-    .orange-header {
-        background-color: #FF8C00;
+    .navy-blue-header {
+        background-color: #000080;
         padding: 15px;
         border-radius: 15px 15px 0 0;
         text-align: center;
@@ -85,7 +85,7 @@ if st.session_state.chat_open:
         st.markdown('<div id="chat-anchor"></div>', unsafe_allow_html=True)
         
         st.markdown("""
-            <div class="orange-header">
+            <div class="navy-blue-header">
                 <h4 style='color: white; margin: 0;'>🤖 Pantry Assistant</h4>
             </div>
         """, unsafe_allow_html=True)

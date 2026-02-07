@@ -1,8 +1,20 @@
 import google.generativeai as genai
 import os
 import json
-import random
 from dotenv import load_dotenv
+
+load_dotenv()
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Check if key is loaded in your terminal
+if not API_KEY:
+    print("❌ ERROR: GEMINI_API_KEY not found in .env file")
+else:
+    print(f"✅ API Key loaded: {API_KEY[:5]}...")
+
+genai.configure(api_key=API_KEY)
+# Using flash for faster chat response
+model = genai.GenerativeModel("gemini-1.5-flash")
 from data_engine import (
     get_live_details,
     find_cheapest_store,
@@ -137,6 +149,63 @@ Instructions:
         return {"shopping_list": fallback_list, "recipes": fallback_recipes, "upsell_suggestions": [], "error": str(e)}
 
 # -----------------------------
+# AI STORE OPTIMIZATION LAYER
+# -----------------------------
+# -----------------------------
+# AI STORE OPTIMIZATION LAYER
+# -----------------------------
+def ai_optimize_cart(shopping_list, stores):
+    """
+    Applies AI + data-engine reasoning to enrich the shopping list
+    with store choice, savings explanation, and alternatives.
+    """
+
+    enriched = []
+
+    for entry in shopping_list:
+        item = entry["item"]
+
+        # Get live store data (price + stock)
+        store_details = get_live_details(item, stores)
+
+        # Best store (your existing logic)
+        cheapest = find_cheapest_store(item, stores)
+
+        # Second-best store for comparison
+        sorted_prices = sorted(
+            [
+                (store, data["price"])
+                for store, data in store_details.items()
+                if data.get("price") is not None
+            ],
+            key=lambda x: x[1]
+        )
+        if cheapest is None or cheapest.get("price") is None:
+            continue
+
+        second_best = sorted_prices[1] if len(sorted_prices) > 1 else None
+
+        # AI-driven alternative (your logic)
+        alternative = find_best_alternative(item, store_details)
+
+        enriched.append({
+            "item": item,
+            "recommended_quantity": entry.get("recommended_quantity", "1 unit"),
+            "best_store": cheapest["store"] if cheapest else None,
+            "best_price": cheapest["price"] if cheapest else None,
+            "second_store": second_best[0] if second_best else None,
+            "second_price": second_best[1] if second_best else None,
+            "savings": round(
+                (second_best[1] - cheapest["price"])
+                if cheapest and second_best else 0,
+                2
+            ),
+            "alternative": alternative,
+            "reason": entry.get("reason", "Predicted need or low stock")
+        })
+
+    return enriched
+# -----------------------------
 # PREDICT LOW-STOCK AI
 # -----------------------------
 def predict_low_stock(usual_items, household_size, grocery_freq, last_trip):
@@ -163,13 +232,24 @@ Output JSON: {{"low_items": ["item1"]}}
     raw_next = last_trip + datetime.timedelta(days=max(1, round(7 / grocery_freq))) if last_trip else None
     suggested_next_str = raw_next.strftime("%A, %b %d") if raw_next else None
 
-    ai_results = generate_shopping_list(household_size, grocery_freq, [], usual_items, last_trip, low_items)
+    ai_results = generate_shopping_list(
+        household_size,
+        grocery_freq,
+        [],
+        usual_items,
+        last_trip,
+        low_items
+    )
+
+    optimized_cart = ai_optimize_cart(
+        ai_results.get("shopping_list", []),
+        ["Walmart", "Costco", "Target"]
+    )
 
     return {
         "low_items": low_items,
         "suggested_next_trip": suggested_next_str,
-        "shopping_list": ai_results.get("shopping_list", []),
-        "upsell_suggestions": ai_results.get("upsell_suggestions", []),
+        "shopping_list": optimized_cart,
         "recipes": ai_results.get("recipes", [])
     }
 

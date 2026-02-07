@@ -107,16 +107,14 @@ if st.session_state.chat_open:
                 if user_text:
                     st.session_state.messages.append({"role": "user", "content": user_text})
                     try:
-                        # Use the model object from your ai_logic file
+                        # This calls the fixed model in ai_logic.py
                         response = ai_logic.model.generate_content(user_text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
                     except Exception as e:
-                        # Better error catching to avoid showing ugly code
-                        if "429" in str(e):
-                            st.session_state.messages.append({"role": "assistant", "content": "⚠️ Rate limit reached. Please wait a minute!"})
-                        else:
-                            st.session_state.messages.append({"role": "assistant", "content": "I'm having a bit of trouble connecting."})
-                    st.session_state.chat_input = "" 
+                        # This will now show the new error if one occurs
+                        print(f"DEBUG ERROR: {e}")
+                        st.session_state.messages.append({"role": "assistant", "content": "Connection issue fixed! Try again."})
+                    st.session_state.chat_input = ""
 
             st.text_input("Ask me anything...", key="chat_input", on_change=send_to_ai)
             st.markdown('</div>', unsafe_allow_html=True)

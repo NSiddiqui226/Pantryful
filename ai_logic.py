@@ -1,20 +1,10 @@
 import google.generativeai as genai
 import os
 import json
+import random
+import datetime
+import pandas as pd
 from dotenv import load_dotenv
-
-load_dotenv()
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-# Check if key is loaded in your terminal
-if not API_KEY:
-    print("❌ ERROR: GEMINI_API_KEY not found in .env file")
-else:
-    print(f"✅ API Key loaded: {API_KEY[:5]}...")
-
-genai.configure(api_key=API_KEY)
-# Using flash for faster chat response
-model = genai.GenerativeModel("gemini-1.5-flash")
 from data_engine import (
     get_live_details,
     find_cheapest_store,
@@ -31,7 +21,7 @@ load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-pro")
 
 # -----------------------------
 # HELPER: REAL RECIPES FROM full_format_recipes.json

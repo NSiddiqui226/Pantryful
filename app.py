@@ -93,9 +93,9 @@ if st.session_state.step == 0:
     st.markdown("### Where do you usually shop?")
 
     stores = [
-        ("🛒 Walmart", "Walmart"),
-        ("📦 Costco", "Costco"),
-        ("🎯 Target", "Target")
+        (" Walmart", "Walmart"),
+        (" Costco", "Costco"),
+        (" Target", "Target")
     ]
 
     cols = st.columns(len(stores))
@@ -149,9 +149,8 @@ elif st.session_state.step == 1:
         st.session_state.grocery_freq = grocery_freq
         st.session_state.step = 2
         st.rerun()
-
 # -----------------------------
-# STEP 2 — USUAL ITEMS
+# STEP 2 — USUAL ITEMS (PILL BUTTONS)
 # -----------------------------
 elif st.session_state.step == 2:
     category = CATEGORY_ORDER[st.session_state.category_index]
@@ -162,13 +161,33 @@ elif st.session_state.step == 2:
     st.caption(f"Category {st.session_state.category_index + 1} of {TOTAL_CATEGORIES}")
 
     st.markdown(f"### {category}")
-    selections = st.multiselect(
-        f"Your usual {category.lower()} items",
-        items,
-        default=st.session_state.usuals.get(category, [])
-    )
+    st.caption("Select what you usually keep at home — or skip if it doesn’t apply.")
 
-    st.session_state.usuals[category] = selections
+    # Ensure category exists in session state
+    if category not in st.session_state.usuals:
+        st.session_state.usuals[category] = []
+
+    selected_items = set(st.session_state.usuals[category])
+
+    # Display items as pill buttons
+    cols = st.columns(3)
+    for i, item in enumerate(items):
+        col = cols[i % 3]
+        is_selected = item in selected_items
+        container_class = "selected-pill" if is_selected else ""
+
+        with col:
+            st.markdown(f"<div class='{container_class}'>", unsafe_allow_html=True)
+            if st.button(item, key=f"{category}_{item}"):
+                if is_selected:
+                    selected_items.remove(item)
+                else:
+                    selected_items.add(item)
+                st.session_state.usuals[category] = list(selected_items)
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
 
     col1, col2, col3 = st.columns(3)
 

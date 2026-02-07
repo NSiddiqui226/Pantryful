@@ -129,11 +129,9 @@ TOTAL_CATEGORIES = len(CATEGORY_ORDER)
 # -----------------------------
 # WELCOME PAGE
 # -----------------------------
-if "step" not in st.session_state:
-    st.session_state.step = -1  # start with welcome page
-
 if st.session_state.step == -1:
     st.title("🧺 PantryFull")
+<<<<<<< HEAD
     st.markdown("""
     **Welcome to PantryFull!** You'll never have to say "oh no, we're out" again
     PantryFull helps you keep your pantry organized, track what you usually buy,  
@@ -143,6 +141,27 @@ if st.session_state.step == -1:
     if st.button("Get Started →"):
         st.session_state.step = 0
         st.rerun()
+=======
+
+    col_img, col_text = st.columns([1, 2])
+
+    with col_img:
+        st.image("grocerybag.png", use_container_width=True)
+
+    with col_text:
+        st.markdown("""
+        **Welcome to PantryFull!**  
+        You'll never have to say "oh no, we're out" again  
+
+        PantryFull helps you keep your pantry organized, track what you usually buy,  
+        and get AI-powered insights to make shopping easier.  
+
+        Never run out of your essentials again!
+        """)
+
+        st.button("Get Started →", on_click=lambda: st.session_state.update({"step": 0}))
+
+>>>>>>> d444d8a3f0fa1b08d01510c15d54fcdee9359ae6
 
 # -----------------------------
 # STEP 0 — LAST GROCERY TRIP
@@ -165,23 +184,38 @@ if st.session_state.step == 0:
 # -----------------------------
 # STEP 1 — STORES
 # -----------------------------
+# -----------------------------
+# STEP 1 — STORES (Logo Pill Buttons)
+# -----------------------------
+# -----------------------------
+# STEP 1 — STORES (Logo Above Button)
+# -----------------------------
 elif st.session_state.step == 1:
     st.title("🧺 PantryFull")
     st.caption("Where do you usually shop?")
-    stores = [("Walmart", "Walmart"), ("Costco", "Costco"), ("Target", "Target")]
+
+    stores = [
+        ("Walmart", "walmart.png"),
+        ("Costco", "costco.png"),
+        ("Target", "target.png")
+    ]
+
     cols = st.columns(len(stores))
-    for i, (label, store) in enumerate(stores):
-        is_selected = store in st.session_state.stores_selected
-        container_class = "selected-pill" if is_selected else ""
+    for i, (store_name, logo_file) in enumerate(stores):
+        is_selected = store_name in st.session_state.stores_selected
+        selected_class = "selected-pill" if is_selected else ""
+
         with cols[i]:
-            st.markdown(f"<div class='{container_class}'>", unsafe_allow_html=True)
-            if st.button(label, key=f"store_{store}"):
+            # Display logo above button
+            st.image(logo_file, width=50)
+
+            # Pill-style button
+            if st.button(store_name, key=f"store_{store_name}"):
                 if is_selected:
-                    st.session_state.stores_selected.remove(store)
+                    st.session_state.stores_selected.remove(store_name)
                 else:
-                    st.session_state.stores_selected.add(store)
+                    st.session_state.stores_selected.add(store_name)
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.stores_selected:
         st.caption("Selected: " + ", ".join(st.session_state.stores_selected))
@@ -194,6 +228,7 @@ elif st.session_state.step == 1:
             st.rerun()
         else:
             st.warning("Please select at least one store.")
+
 
 # -----------------------------
 # STEP 2 — HOUSEHOLD + FREQUENCY

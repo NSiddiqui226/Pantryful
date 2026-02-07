@@ -1,0 +1,5 @@
+[theme]
+primaryColor = "#DC2626"              # red
+backgroundColor = "#EAF4FF"           # light blue (main page)
+secondaryBackgroundColor = "#F1F7FF"  # cards / containers
+textColor = "#111827"

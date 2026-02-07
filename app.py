@@ -1,22 +1,9 @@
-
-# app.py
 import streamlit as st
 import time
 import pandas as pd
-import ai_logic  # Bridge to the brain
+import ai_logic 
 
 st.set_page_config(page_title="Replen AI", page_icon="🤖")
-
-# State management
-
-import streamlit as st
-import time
-import pandas as pd
-
-# Basic Page Setup
-st.set_page_config(page_title="Replen AI", page_icon="🤖")
-
-# State management to keep track of steps
 
 if 'step' not in st.session_state:
     st.session_state.step = 0
@@ -24,91 +11,47 @@ if 'step' not in st.session_state:
 # STEP 0: ONBOARDING
 if st.session_state.step == 0:
     st.title("🤖 Welcome to Replen")
-    st.write("Let's set up your smart pantry.")
-    
     stores = st.multiselect("Which stores do you use?", ["Walmart", "Costco", "Target"])
     h_size = st.number_input("Household Size", min_value=1, max_value=10, value=2)
     
     if st.button("Start Anticipating My Needs"):
-        if not stores:
-            st.warning("Please select at least one store!")
-        else:
+        if stores:
             st.session_state.stores = stores
             st.session_state.h_size = h_size
             st.session_state.step = 1
             st.rerun()
+        else:
+            st.warning("Select a store first!")
 
-# STEP 1: AI ANALYSIS
+# STEP 1: LOADING
 elif st.session_state.step == 1:
-    st.header("Analyzing your consumption patterns...")
+    st.header("AI is analyzing your consumption...")
+    # Trigger the logic
+    st.session_state.ai_results = ai_logic.analyze_pantry(st.session_state.h_size, st.session_state.stores)
     
-    # Process data through our Logic File
-    results = ai_logic.analyze_pantry(st.session_state.h_size, st.session_state.stores)
-    st.session_state.ai_results = results
-    
-    progress_bar = st.progress(0)
+    bar = st.progress(0)
     for i in range(100):
         time.sleep(0.01)
-
-    stores = st.multiselect("Which stores do you use?", ["Walmart", "Costco", "Target", "Amazon"])
-    h_size = st.number_input("Household Size", min_value=1, max_value=10, value=2)
-    diet = st.multiselect("Dietary Needs", ["Vegan", "Halal", "Kosher", "None"])
-    
-    if st.button("Start Anticipating My Needs"):
-        st.session_state.h_size = h_size
-        st.session_state.step = 1
-        st.rerun()
-
-# STEP 1: AI ANALYSIS (The WOW Factor)
-elif st.session_state.step == 1:
-    st.header("Analyzing your data...")
-    progress_bar = st.progress(0)
-    
-    # Fake AI "thinking" time
-    for i in range(100):
-        time.sleep(0.02)
-
-        progress_bar.progress(i + 1)
-        
+        bar.progress(i + 1)
     st.session_state.step = 2
     st.rerun()
 
-# STEP 2: THE DASHBOARD
+# STEP 2: DASHBOARD
 elif st.session_state.step == 2:
-    st.title("⚡ Your Smart Dashboard")
-
+    st.title("⚡ Smart Dashboard")
     res = st.session_state.ai_results
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label="Oat Milk Supply", value=f"{res['days_left']} Days Left")
-    with col2:
-        st.metric(label="Local Status", value=res['status'])
 
-    # The AI Suggestion Card
-    st.info(f"**AI Insight:** {res['recommendation']}")
+    col1, col2 = st.columns(2)
+    col1.metric("Oat Milk Supply", f"{res['days_left']} Days")
+    col2.metric("Store Status", res['status'])
+
+    st.error(res['recommendation']) if "ALERT" in res['recommendation'] else st.success(res['recommendation'])
     
-    st.write("### Weekly Usage Trend")
-    chart_data = pd.DataFrame([10, 25, 45, 60, 75, 80, 95], columns=["Usage %"])
-    st.line_chart(chart_data)
+    with st.expander("🤖 AI Chef's Tip"):
+        st.write(res['ai_tip'])
+
+    st.line_chart(pd.DataFrame([10, 25, 40, 55, 70, 90], columns=["Usage %"]))
     
     if st.button("Reset Demo"):
         st.session_state.step = 0
         st.rerun()
-
-    
-    # Simple logic: More people = faster consumption
-    # Formula: 14 days divided by household size
-    days_left = round(14 / st.session_state.h_size)
-    
-    st.metric(label="Oat Milk Supply", value=f"{days_left} Days Left", delta="-2 Days since yesterday")
-    
-    st.write("### Consumption Trends")
-    # Generating a simple data chart
-    data = pd.DataFrame([20, 35, 30, 45, 70, 85, 90], columns=["Usage %"])
-    st.line_chart(data)
-    
-    if st.button("Approve Restock Order"):
-        st.balloons()
-        st.success("Order placed successfully!")
-

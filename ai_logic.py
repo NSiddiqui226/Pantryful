@@ -1,8 +1,14 @@
 import google.generativeai as genai
+import data_engine
+import os
+from dotenv import load_dotenv
 
-# 1. Setup
-API_KEY = "AIzaSyAmJdoiPkyKYs6xDgnqLPpmpHqdv_h5cxU"
+# Load the secret key from .env file
+load_dotenv()
+API_KEY = os.getenv("GEMINI_API_KEY")
+
 genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 # 2. Automated Model Picker (The 404 Killer)
 # Instead of guessing the name, we ask the server what is available

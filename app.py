@@ -63,6 +63,7 @@ PANTRY_CATEGORIES = {
 }
 
 CATEGORY_ORDER = list(PANTRY_CATEGORIES.keys())
+TOTAL_CATEGORIES = len(CATEGORY_ORDER)
 
 # -----------------------------
 # STEP 0 — STORES
@@ -117,10 +118,14 @@ elif st.session_state.step == 2:
     items = PANTRY_CATEGORIES[category]
 
     st.title("🧺 PantryFull")
-    st.caption("Select what you usually keep at home.")
+
+    # Progress bar
+    progress = (st.session_state.category_index + 1) / TOTAL_CATEGORIES
+    st.progress(progress)
+    st.caption(f"Category {st.session_state.category_index + 1} of {TOTAL_CATEGORIES}")
 
     st.markdown(f"### {category}")
-    st.caption("Select all that apply")
+    st.caption("Select what you usually keep at home — or skip if it doesn’t apply.")
 
     selections = st.multiselect(
         f"Your usual {category.lower()} items",
@@ -131,58 +136,26 @@ elif st.session_state.step == 2:
     st.session_state.usuals[category] = selections
 
     st.markdown("---")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
+    # BACK
     if col1.button("← Back") and st.session_state.category_index > 0:
         st.session_state.category_index -= 1
         st.rerun()
 
-    if col2.button("Next →"):
-        if st.session_state.category_index < len(CATEGORY_ORDER) - 1:
+    # SKIP
+    if col2.button("Skip →"):
+        st.session_state.usuals[category] = []
+        if st.session_state.category_index < TOTAL_CATEGORIES - 1:
             st.session_state.category_index += 1
-            st.rerun()
         else:
             st.session_state.step = 3
-            st.rerun()
+        st.rerun()
 
-# -----------------------------
-# STEP 3 — DASHBOARD / AI ON DEMAND
-# -----------------------------
-elif st.session_state.step == 3:
-    st.title("⚡ Smart Dashboard")
-
-    col1, col2 = st.columns(2)
-    col1.metric("Household Size", st.session_state.h_size)
-    col2.metric("Shopping Frequency", f"{st.session_state.grocery_freq}x / week")
-
-    st.markdown("---")
-
-    st.subheader("🛒 Your Next Shopping List")
-    st.caption("Generated only when you ask.")
-
-    if not st.session_state.ai_triggered:
-        if st.button("🤖 Generate Shopping List"):
-            st.session_state.ai_results = ai_logic.generate_shopping_list(
-                st.session_state.h_size,
-                st.session_state.stores,
-                st.session_state.usuals,
-                st.session_state.grocery_freq
-            )
-            st.session_state.ai_triggered = True
-            st.rerun()
-
-    elif st.session_state.ai_results:
-        for item in st.session_state.ai_results["shopping_list"]:
-            st.write(f"• {item['name']} — Qty: {item['quantity']}")
-
-        st.markdown("---")
-        st.subheader("🍳 Recipe Suggestions")
-
-        for r in st.session_state.ai_results["recipes"]:
-            st.markdown(f"**{r['name']}**")
-            st.write(r["instructions"])
-            st.markdown("---")
-
-    if st.button("🔄 Start Over"):
-        st.session_state.clear()
+    # NEXT
+    if col3.button("Next →"):
+        if st.session_state.category_index < TOTAL_CATEGORIES - 1:
+            st.session_state.category_index += 1
+        else:
+            st.session_state.step = 3
         st.rerun()

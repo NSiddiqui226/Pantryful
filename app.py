@@ -2,75 +2,73 @@ import streamlit as st
 import datetime
 from data_engine import find_cheapest_store, find_best_alternative, find_category_substitute
 import ai_logic
+import chat_bot
 
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
-
-st.set_page_config(page_title="PantryFull", page_icon="🧺", layout="centered")
+st.set_page_config(page_title="PantryFul", page_icon="🧺", layout="centered")
 
 # -----------------------------
-# GLOBAL CSS (PILL BUTTONS)
+# SUBTLE BACKGROUND GIF CONFIG
+# -----------------------------
+st.markdown(
+    """
+    <style>
+    .stApp {
+        /* This creates a "Frosted Glass" effect: Dark tint + Blur */
+        background: 
+            linear-gradient(rgba(17, 24, 39, 0.8), rgba(17, 24, 39, 0.8)), 
+            url("https://media.giphy.com/media/3oEjHEbAfMn6PVEqDS/giphy.gif");
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+        backdrop-filter: blur(4px); /* Adds subtle softness to the background */
+    }
+
+    /* Keep text white and readable */
+    h1, h2, h3, p, span, label, .stMarkdown, [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+        color: white !important;
+    }
+
+    /* Ensure containers are more opaque (solid) to stand out */
+    [data-testid="stVerticalBlock"] > div:has(div.stContainer) {
+        background-color: rgba(31, 41, 55, 0.95) !important;
+        border-radius: 12px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -----------------------------
+# GLOBAL CSS (ENHANCED PILL BUTTONS)
 # -----------------------------
 st.markdown("""
 <style>
-/* Global text color */
-html, body, [class*="css"] {
-    color: #1E3A8A !important;  /* dark blue */
-}
-
-/* Titles & headers */
-h1, h2, h3, h4, h5, h6 {
-    color: #1E3A8A !important;
-}
-
-/* Captions, labels, markdown, metrics */
-p, span, label, div {
-    color: #1E3A8A !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-div.stButton > button {
-    border-radius: 999px;
-    padding: 0.6rem 1.4rem;
-    border: 2px solid #E5E7EB;
-    background-color: white;
-    color: #111827;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
 div.stButton > button:hover {
     border-color: #6366F1;
-    background-color: #EEF2FF;
-    color: #4338CA;
+    background-color: #F9FAFB;
+    color: #4F46E5 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
-div.stButton > button:focus {
-    box-shadow: none;
+
+div.stButton > button:active {
+    transform: translateY(0px);
 }
+
+/* Selected pill for category selection */
 .selected-pill > button {
     background-color: #4F46E5 !important;
-    color: white !important;
-    border-color: #4F46E5 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-st.markdown("""
-<style>
-/* Import Aleo font from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Aleo&display=swap');
-
-/* Apply Alteo font to all titles (st.title) */
-h1 {
-    font-family: 'Aleo', sans-serif !important;
-    font-weight: normal !important; /* Aleo is naturally bold, adjust if needed */
+    color: #FFFFFF !important;
+    border-color: #4338CA !important;
 }
 
-/* Optional: make all headers (h2, h3) use Aleo too */
-h2, h3 {
-    font-family: 'Aleo', sans-serif !important;
+/* Fix for buttons inside white dashboard cards */
+[data-testid="stVerticalBlock"] div.stButton > button:not(.get-started-primary) {
+    width: 100%;
+    margin-top: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -114,11 +112,27 @@ PANTRY_CATEGORIES = {
 }
 CATEGORY_ORDER = list(PANTRY_CATEGORIES.keys())
 TOTAL_CATEGORIES = len(CATEGORY_ORDER)
+
 # -----------------------------
 # WELCOME PAGE
 # -----------------------------
 if st.session_state.step == -1:
     st.title("🧺 PantryFull")
+
+    # st.markdown("""
+    # **Welcome to PantryFull!** You'll never have to say "oh no, we're out" again
+    # PantryFull helps you keep your pantry organized, track what you usually buy,  
+    # and get AI-powered insights to make shopping easier.  
+    # Never run out of your essentials again!
+    # """)
+    st.markdown('<div class="get-started-btn">', unsafe_allow_html=True)
+
+    if st.button("Get Started →"):
+        st.session_state.step = 0
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
     col_img, col_text = st.columns([1, 2])
 
@@ -135,9 +149,6 @@ if st.session_state.step == -1:
 
         Never run out of your essentials again!
         """)
-
-        st.button("Get Started →", on_click=lambda: st.session_state.update({"step": 0}))
-
 
 # -----------------------------
 # STEP 0 — LAST GROCERY TRIP
@@ -299,11 +310,11 @@ elif st.session_state.step == 4:
         st.rerun()
     if col2.button("Generate AI Insights →"):
         if not st.session_state.ai_triggered:
-            st.session_state.ai_results = ai_logic.generate_shopping_list(
+            st.session_state.ai_results = ai_logic.predict_low_stock(
+                usual_items=st.session_state.usuals,
                 household_size=st.session_state.h_size,
                 grocery_freq=st.session_state.grocery_freq,
-                stores=st.session_state.stores,
-                pantry_usuals=st.session_state.usuals
+                last_trip=st.session_state.last_trip_date
             )
             st.session_state.ai_triggered = True
         st.session_state.step = 5
@@ -312,11 +323,9 @@ elif st.session_state.step == 4:
 elif st.session_state.step == 5:
     st.title("⚡ Smart Pantry Dashboard")
     
-    # --- 1. THE DATA SYNC ---
-    # Force the AI to analyze the data if it hasn't yet
+    # --- 1. THE DATA SYNC (Using your exact AI logic) ---
     if not st.session_state.ai_triggered:
         with st.spinner("🧠 AI is analyzing your pantry & store prices..."):
-            # This calls your predict_low_stock which handles the Scarcity vs Surplus logic
             st.session_state.ai_results = ai_logic.predict_low_stock(
                 usual_items=st.session_state.usuals,
                 household_size=st.session_state.h_size,
@@ -332,73 +341,126 @@ elif st.session_state.step == 5:
 
     # --- 2. TOP KPI BAR ---
     from data_engine import MOCK_PURCHASE_HISTORY
-    # Calculate how many items are over 10 days old
     aging_items = [k for k, v in MOCK_PURCHASE_HISTORY.items() if (datetime.date.today() - v).days > 10]
     
     m1, m2, m3 = st.columns(3)
-    m1.metric("Household", f"{st.session_state.h_size} Ppl")
+    m1.metric("Household", f"{st.session_state.h_size} People")
     m2.metric("Waste Risk", f"{len(aging_items)} Items", delta="Action Required", delta_color="inverse")
-    m3.metric("Stock Alerts", f"{len(low_items)} Low", delta="-5% vs Last Week")
+    m3.metric("Stock Alerts", f"{len(low_items)} Low")
 
     st.markdown("---")
 
     # --- 3. THE INTERACTIVE GRID ---
     col_left, col_right = st.columns(2)
 
-    # CARD 1: SMART SHOPPING (Scarcity Logic)
+    # CARD 1: SMART CART (AI-Driven)
     with col_left:
         with st.container(border=True):
             st.markdown("### 🛒 Smart Cart")
-            st.caption("Cheapest matches for items you're running out of")
-            
+
             if shopping_list:
+                total_savings = sum(item.get("savings", 0) for item in shopping_list)
+
+                st.info(f"✨ AI found **${total_savings:.2f}** in potential savings today!")
+                st.caption("Optimized using live store pricing and your preferences")
+
                 for item in shopping_list:
+                    name = item["item"]
+                    best_store = item.get("best_store")
+                    best_price = item.get("best_price")
+                    second_store = item.get("second_store")
+                    savings = item.get("savings", 0)
+                    reason = item.get("reason", "AI predicted need")
+
                     c1, c2 = st.columns([3, 1])
+
                     with c1:
-                        # Displaying the item and the reason it was added
-                        st.checkbox(f"**{item['item']}**", key=f"list_{item['item']}", value=True)
-                        st.caption(f"📍 {item.get('store', 'Walmart')} • {item.get('reason', 'Refill')}")
+                        st.checkbox(
+                            f"**{name}**",
+                            key=f"cart_{name}",
+                            value=True
+                        )
+                        if best_store:
+                            store_line = f"📍 {best_store}"
+                            if second_store and savings > 0:
+                                store_line += f" <span style='color:#059669;'>(Save ${savings:.2f} vs {second_store})</span>"
+                        else:
+                            store_line = "📍 No preferred store available"
+
+                        st.markdown(
+                            f"""
+                            <div style="font-size: 0.8rem; color: #111827; margin-left: 30px;">
+                                {store_line}<br>
+                                🏷️ {reason}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                        
+
+                        if item.get("alternative"):
+                            alt = item["alternative"]
+                            st.markdown(
+                                f"""
+                                <div style="font-size: 0.75rem; margin-left: 30px; color:#6B7280;">
+                                    🔁 Alternative: {alt['item']} (${alt['price']})
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
                     with c2:
-                        # Pulling real mock price from data_engine
-                        price = item.get('price', 0.00)
-                        st.markdown(f"**${price:.2f}**")
+                        price_display = (
+                            f"${best_price:.2f}"
+                            if isinstance(best_price, (int, float))
+                            else "Price unavailable"
+                        )
+
+                        st.markdown(
+                            f"<p style='font-weight:600; margin-top:6px;'>{price_display}</p>",
+                            unsafe_allow_html=True
+                        )
+
+                st.markdown("---")
+                col_btn1, col_btn2 = st.columns(2)
+
+                with col_btn1:
+                    st.button("📱 Share List", key="share_cart", use_container_width=True)
+
+                with col_btn2:
+                    st.button("📦 Order Now", key="order_cart", type="primary", use_container_width=True)
+
             else:
                 st.success("✅ Shopping list is clear!")
 
-    # CARD 2: FRESHNESS TRACKER (Historical Logic)
+    # CARD 2: FRESHNESS TRACKER
     with col_right:
         with st.container(border=True):
             st.markdown("### 📦 Freshness Tracker")
-            st.caption("Based on last bought dates in Data Engine")
+            # Text inside boxes forced to black for readability
+            st.markdown('<p style="color: #111827; font-size: 0.8rem;">Based on last bought dates</p>', unsafe_allow_html=True)
             
             for item, buy_date in MOCK_PURCHASE_HISTORY.items():
                 days_old = (datetime.date.today() - buy_date).days
-                # Visual bar: Red for old, Green for fresh
                 progress = min(days_old / 21, 1.0)
                 bar_color = "red" if days_old > 14 else "orange" if days_old > 7 else "green"
                 
-                st.markdown(f"**{item}** — {days_old} days old")
+                st.markdown(f"<b style='color: #111827;'>{item}</b> <span style='color: #111827;'>— {days_old} days old</span>", unsafe_allow_html=True)
                 st.markdown(f"""
-                    <div style="width:100%; background:#f0f2f6; border-radius:10px; height:8px;">
+                    <div style="width:100%; background:#e5e7eb; border-radius:10px; height:8px; margin-bottom:10px;">
                         <div style="width:{progress*100}%; background:{bar_color}; height:8px; border-radius:10px;"></div>
                     </div>
                 """, unsafe_allow_html=True)
-                st.write("") # Spacer
 
-    # CARD 3: ZERO-WASTE CHEF (Surplus Logic)
+    # CARD 3: ZERO-WASTE CHEF
     st.markdown("### 🍳 Zero-Waste Recipes")
-    st.caption("Using aging items while protecting your low-stock staples")
-    
     if recipes:
-        # Display recipes in a horizontal scrolling-style grid
         recipe_cols = st.columns(len(recipes))
         for i, r in enumerate(recipes):
             with recipe_cols[i]:
                 with st.container(border=True):
-                    st.markdown(f"##### {r['name']}")
-                    # Extract the "clears out" info if available
-                    if "clears out" in r['name'].lower():
-                        st.toast(f"Found recipe for {r['name']}")
+                    # Forcing titles inside white boxes to black
+                    st.markdown(f"<h5 style='color: #111827;'>{r['name']}</h5>", unsafe_allow_html=True)
                     
                     with st.expander("View Preparation"):
                         st.write(r['instructions'])
@@ -408,8 +470,148 @@ elif st.session_state.step == 5:
     else:
         st.info("AI is looking for recipes that won't use up the last of your stock...")
 
-    # --- 4. ACTION FOOTER ---
     st.markdown("---")
     if st.button("🔄 Force Refresh AI Insights"):
         st.session_state.ai_triggered = False
         st.rerun()
+    # --- ADD THIS TO THE VERY BOTTOM OF app.py ---
+
+# 1. Initialize Conversation State (Only if not already set)
+if "chat_open" not in st.session_state:
+    st.session_state.chat_open = False
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hi! I'm your Pantry AI. Ask me for a recipe or shopping advice! 🤖"}
+    ]
+
+# 2. Add the Chatbot CSS (Pinned to bottom right)
+st.markdown("""
+<style>
+    /* Floating Toggle Button */
+    div.stButton > button[data-testid="baseButton-secondary"] {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        z-index: 1001;
+        background-color: #FF4B4B !important;
+        color: white !important;
+        font-size: 24px;
+    }
+
+    /* THE CHAT BOX CONTAINER */
+    [data-testid="stVerticalBlockBorderWrapper"]:has(#chat-anchor) {
+        position: fixed !important;
+        bottom: 90px !important;
+        right: 20px !important;
+        width: 320px !important;
+        height: 500px !important;
+        background-color: white !important;
+        border-radius: 15px !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+        z-index: 1000 !important;
+        padding: 0px !important;
+        overflow: hidden !important;
+    }
+
+    .orange-header {
+        background-color: #000080;
+        padding: 15px;
+        border-radius: 15px 15px 0 0;
+        text-align: center;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 3. Chat Logic
+# We wrap this in a container to ensure it stays in its own "layer"
+if st.button("💬", key="chat_toggle_btn"):
+    st.session_state.chat_open = not st.session_state.chat_open
+
+if st.session_state.chat_open:
+    with st.container():
+        st.markdown('<div id="chat-anchor"></div>', unsafe_allow_html=True)
+        
+        st.markdown("""
+            <div class="orange-header">
+                <h4 style='color: white; margin: 0; font-family: sans-serif;'>🤖 Pantry Assistant</h4>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with st.container():
+            # Messages Area
+            msg_area = st.container(height=320, border=False)
+            
+            with msg_area:
+                for msg in st.session_state.messages:
+                    role_label = "AI" if msg["role"] == "assistant" else "You"
+                    # Using black color for text inside the white box regardless of global CSS
+                    st.markdown(f"<p style='color: black !important;'><b>{role_label}:</b> {msg['content']}</p>", unsafe_allow_html=True)
+
+            # Input Function
+            def send_to_ai():
+                user_text = st.session_state.chat_input
+                if user_text:
+                    st.session_state.messages.append({"role": "user", "content": user_text})
+                    try:
+                        # Explicitly call the model from ai_logic
+                        response = ai_logic.model.generate_content(user_text)
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    except Exception as e:
+                        # Print the actual error to your terminal for debugging
+                        print(f"DEBUG CHAT ERROR: {e}")
+                        st.session_state.messages.append({"role": "assistant", "content": "I'm having a bit of trouble connecting."})
+                    st.session_state.chat_input = "" 
+
+            st.text_input("Ask me anything...", key="chat_input", on_change=send_to_ai)
+
+st.markdown("""
+<style>
+/* FORCE ALL STREAMLIT BUTTONS TO NAVY BLUE */
+div.stButton > button {
+    background-color: #000080 !important; /* Navy Blue */
+    color: #FFFFFF !important;           /* White Text */
+    border-color: #000080 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Hover state: Darker Navy */
+div.stButton > button:hover {
+    background-color: #000066 !important; 
+    color: #FFFFFF !important;
+    border-color: #000066 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Active (pressed) */
+div.stButton > button:active {
+    background-color: #000044 !important;
+    transform: translateY(0px);
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+/* ONLY the Get Started button */
+.get-started-btn div.stButton > button {
+    background-color: #22C55E !important;   /* green */
+    color: #FFFFFF !important;
+    border-color: #22C55E !important;
+    font-size: 1.1rem !important;
+    padding: 0.8rem 2rem !important;
+}
+
+/* Hover */
+.get-started-btn div.stButton > button:hover {
+    background-color: #16A34A !important;
+    border-color: #16A34A !important;
+}
+</style>
+""", unsafe_allow_html=True)
